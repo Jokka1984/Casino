@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Club Raffle</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+
+<style>
+body {
+    background-color: #1d1934;
+    font-family: "Segoe UI", Arial, sans-serif;
+    margin: 0;
+    text-align: center;
+}
+
+#logo {
+    display: block;
+    margin: 20px auto;
+    max-width: 140px;
+}
+
+h1 {
+    font-size: clamp(1.2rem, 4vw, 2.5rem);
+    color: #e12826;
+    margin: 5px;
+}
+
+#display {
+    font-size: clamp(3rem, 12vw, 8rem);
+    color: #fece02;
+    margin: 40px 10px;
+}
+
+.spinning {
+    color: #e12826;
+}
+
+.winner {
+    animation: pop 0.6s ease;
+}
+
+@keyframes pop {
+    50% { transform: scale(1.2); }
+}
+
+button {
+    margin: 10px;
+    font-size: 1.2rem;
+    padding: 12px 20px;
+    border-radius: 8px;
+    border: none;
+}
+
+#start {
+    background: #e12826;
+    color: white;
+}
+
+#confetti {
+    position: fixed;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+}
+</style>
+
+</head>
+
+<body>
+
+<img id="logo" src="logo.png">
+<h1>Weekly Members Draw</h1>
+<h1>Jackpot $250</h1>
+
+<div id="display">Loading...</div>
+<button id="start" disabled>Start Members Draw</button>
+
+<canvas id="confetti"></canvas>
+
+<!-- Only winner sound -->
+
+<audio id="winSound" src="https://assets.mixkit.co/active_storage/sfx/1998/1998-preview.mp3"></audio>
+
+<script>
+let participants = [];
+const display = document.getElementById('display');
+const startBtn = document.getElementById('start');
+const winSound = document.getElementById('winSound');
+
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQhbyJ2fksThS4Hv7c2f0ckZ0L2L7GyXjvYJ7DqKKEjeUl7ES7TSXWw9y-VyhMIpIRvCsCCfL9QD1fV/pub?gid=1606765783&single=true&output=csv";
+
+async function loadParticipants() {
+    try {
+        const res = await fetch(CSV_URL);
+        const text = await res.text();
+
+        const results = Papa.parse(text, { header: true, skipEmptyLines: true });
+        participants = results.data.filter(r => r.Number && r.Name);
+
+        if (participants.length > 0) {
+            startBtn.disabled = false;
+            display.textContent = "?";
+        } else {
+            display.textContent = "No valid data!";
+        }
+    } catch (err) {
+        display.textContent = "Error loading data";
+    }
+}
+
+loadParticipants();
+
+function shuffleAnimation() {
+    let cycles = 0;
+    let delay = 30;
+
+    display.classList.add("spinning");
+
+    function spin() {
+        const randomEntry = participants[Math.floor(Math.random() * participants.length)];
+        display.textContent = `${randomEntry.Number} - ${randomEntry.Name}`;
+
+        cycles++;
+        delay += 5;
+
+        if (cycles < 60) {
+            setTimeout(spin, delay);
+        } else {
+            finishDraw();
+        }
+    }
+
+    spin();
+}
+
+function finishDraw() {
+    display.classList.remove("spinning");
+
+    const winner = participants[Math.floor(Math.random() * participants.length)];
+    display.textContent = `🎉 ${winner.Number} - ${winner.Name} 🎉`;
+
+    display.classList.add("winner");
+
+    // Winner sound only
+    winSound.volume = 0.7;
+    winSound.currentTime = 0;
+    winSound.play().catch(()=>{});
+
+    launchConfetti();
+
+    startBtn.disabled = false;
+}
+
+startBtn.addEventListener('click', () => {
+    startBtn.disabled = true;
+    display.classList.remove("winner");
+    shuffleAnimation();
+});
+
+const canvas = document.getElementById('confetti');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+let confetti = [];
+
+function launchConfetti() {
+    confetti = [];
+    for (let i = 0; i < 120; i++) {
+        confetti.push({
+            x: Math.random() * canvas.width,
+            y: -10,
+            size: Math.random() * 6 + 4,
+            speed: Math.random() * 3 + 2,
+            angle: Math.random() * 360
+        });
+    }
+    animateConfetti();
+}
+
+function animateConfetti() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    confetti.forEach(c => {
+        c.y += c.speed;
+        c.x += Math.sin(c.angle);
+
+        ctx.fillStyle = `hsl(${Math.random()*360},100%,50%)`;
+        ctx.fillRect(c.x, c.y, c.size, c.size);
+    });
+
+    confetti = confetti.filter(c => c.y < canvas.height);
+
+    if (confetti.length > 0) {
+        requestAnimationFrame(animateConfetti);
+    }
+}
+</script>
+
+</body>
+</html>
